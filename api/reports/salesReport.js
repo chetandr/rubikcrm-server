@@ -172,7 +172,7 @@ export default async function getSalesReport(req, res) {
   }
   
 
-  const dbQuery = [{ VCHTYPE: 'Sales' }];
+  const dbQuery = [{ VCHTYPE: {$in:['Sales','Credit Note']} }];
   dbQuery.push({ DATE: { $gte:  new Date(startDate)} });
   dbQuery.push({ DATE: { $lte:  new Date(endDate)} });
   console.log(JSON.stringify(dbQuery));
