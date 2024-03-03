@@ -5,7 +5,7 @@ import getSalesSummaryReport from "./salesSummaryReport.js";
 const reportRouter = Router();
 
 //login
-reportRouter.get("/sales", getSalesReport);
-reportRouter.get("/salesSummary", getSalesSummaryReport);
+reportRouter.post("/sales", getSalesReport);
+reportRouter.post("/salesSummary", getSalesSummaryReport);
 
 export default reportRouter;

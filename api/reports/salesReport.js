@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import { getDB } from "../../db/connection/index.js";
 import lodash from "lodash";
 
-function getListing(reportData) {
+function getListing(reportData, department) {
   const listing = {};
   const months = [
     "01",
@@ -31,39 +31,74 @@ function getListing(reportData) {
     }-${date.getFullYear()}`;
     if (rd.INVENTORIES) {
       rd.INVENTORIES.forEach((ld) => {
-        total += ld.AMOUNT;
-        datum[ld.STOCKITEMNAME] = ld.AMOUNT;
-        if (services[ld.STOCKITEMNAME]) {
-          services[ld.STOCKITEMNAME] += lodash.round(ld.AMOUNT, 2);
+        if (department) {
+          if (ld.DEPARTMENT === department) {
+            // Inventories total
+            total += ld.AMOUNT;
+            datum[ld.STOCKITEMNAME] = ld.AMOUNT;
+            if (services[ld.STOCKITEMNAME]) {
+              services[ld.STOCKITEMNAME] += lodash.round(ld.AMOUNT, 2);
+            } else {
+              services[ld.STOCKITEMNAME] = ld.AMOUNT;
+            }
+            if (departments[ld.DEPARTMENT]) {
+              departments[ld.DEPARTMENT] += lodash.round(ld.AMOUNT, 2);
+            } else {
+              departments[ld.DEPARTMENT] = lodash.round(ld.AMOUNT, 2);
+            }
+          }
         } else {
-          services[ld.STOCKITEMNAME] = ld.AMOUNT;
+            // Inventories total
+          total += ld.AMOUNT;
+          datum[ld.STOCKITEMNAME] = ld.AMOUNT;
+          if (services[ld.STOCKITEMNAME]) {
+            services[ld.STOCKITEMNAME] += lodash.round(ld.AMOUNT, 2);
+          } else {
+            services[ld.STOCKITEMNAME] = ld.AMOUNT;
+          }
+          if (departments[ld.DEPARTMENT]) {
+            departments[ld.DEPARTMENT] += lodash.round(ld.AMOUNT, 2);
+          } else {
+            departments[ld.DEPARTMENT] = lodash.round(ld.AMOUNT, 2);
+          }
         }
-
-        if (departments[ld.DEPARTMENT]) {
-          departments[ld.DEPARTMENT] += lodash.round(ld.AMOUNT, 2);
-        } else {
-          departments[ld.DEPARTMENT] = ld.AMOUNT;
-        }
-        
       });
     }
     if (rd.LEDGERENTRIES) {
       rd.LEDGERENTRIES.forEach((ld) => {
         if (ld.LEDGERNAME !== rd.PARTYLEDGERNAME) {
           if (ld.LEDGERNAME.indexOf("GST") < 0) {
-            total += ld.AMOUNT;
-            datum[ld.LEDGERNAME] = ld.AMOUNT;
-            if (services[ld.LEDGERNAME]) {
-              services[ld.LEDGERNAME] += lodash.round(ld.AMOUNT, 2);
+            if (department) {
+              if (department === ld.DEPARTMENT) {
+                // Ledger total
+                total += lodash.round(ld.AMOUNT, 2);
+                datum[ld.LEDGERNAME] = ld.AMOUNT;
+                if (services[ld.LEDGERNAME]) {
+                  services[ld.LEDGERNAME] += lodash.round(ld.AMOUNT, 2);
+                } else {
+                  services[ld.LEDGERNAME] = ld.AMOUNT;
+                }
+                if (departments[ld.DEPARTMENT]) {
+                  departments[ld.DEPARTMENT] += lodash.round(ld.AMOUNT, 2);
+                } else {
+                  departments[ld.DEPARTMENT] = lodash.round(ld.AMOUNT, 2);
+                }
+              }
             } else {
-              services[ld.LEDGERNAME] = ld.AMOUNT;
+              // Ledger total
+              total += lodash.round(ld.AMOUNT, 2);
+              datum[ld.LEDGERNAME] = ld.AMOUNT;
+              if (services[ld.LEDGERNAME]) {
+                services[ld.LEDGERNAME] += lodash.round(ld.AMOUNT, 2);
+              } else {
+                services[ld.LEDGERNAME] = ld.AMOUNT;
+              }
+              if (departments[ld.DEPARTMENT]) {
+                departments[ld.DEPARTMENT] += lodash.round(ld.AMOUNT, 2);
+              } else {
+                departments[ld.DEPARTMENT] = lodash.round(ld.AMOUNT, 2);
+              }
             }
-            if (departments[ld.DEPARTMENT]) {
-              departments[ld.DEPARTMENT] += lodash.round(ld.AMOUNT, 2);
-            } else {
-              departments[ld.DEPARTMENT] = ld.AMOUNT;
-            }
-            
           } else {
             taxes += ld.AMOUNT;
           }
@@ -139,42 +174,73 @@ function getSummary(listing, services, departments) {
   ];
 }
 
+function getFilter(criteria) {
+  const { type, date1, date2, variance, department } = criteria;
+  const columnHead = [];
+  let startDate1 = "",
+    endDate1 = "",
+    startDate2 = "",
+    endDate2 = "";
+  switch (type) {
+    case "yearly":
+      startDate1 = `${date1.year}-04-01`;
+      endDate1 = dayjs(startDate1)
+        .add(1, "year")
+        .subtract(1, "day")
+        .format("YYYY-MM-DD");
+      columnHead.push(date1.year);
+      if (variance) {
+        columnHead.push(date2.year);
+        startDate2 = `${date2.year}-04-01`;
+        endDate2 = dayjs(startDate2)
+          .add(1, "year")
+          .subtract(1, "day")
+          .format("YYYY-MM-DD");
+      }
+      break;
+    case "monthly":
+      startDate1 = `${date1.year}-${date1.month}-01`;
+      endDate1 = dayjs(startDate1).endOf("month").format("YYYY-MM-DD");
+      columnHead.push(dayjs(startDate1).format("MMMM YYYY"));
 
-export default async function getSalesReport(req, res) {
+      if (variance) {
+        startDate2 = `${date2.year}-${date2.month}-01`;
+        endDate2 = dayjs(startDate2).endOf("month").format("YYYY-MM-DD");
+        columnHead.push(dayjs(startDate2).format("MMMM YYYY"));
+      }
+      break;
+    case "range":
+      startDate1 = `${date1.from}`;
+      endDate1 = `${date1.to}`;
+      columnHead.push(`${startDate1} - ${endDate1}`);
+
+      if (variance) {
+        startDate2 = `${date2.from}`;
+        endDate2 = `${date2.to}`;
+        columnHead.push(`${startDate2} - ${endDate2}`);
+      }
+      break;
+  }
+  return {
+    startDate1,
+    endDate1,
+    startDate2: startDate2 || startDate1,
+    endDate2: endDate2 || endDate1,
+    variance,
+    columnHead,
+    department,
+  };
+}
+
+async function getSalesData(startDate, endDate, department, title) {
   const { db, client } = await getDB();
-  const date = dayjs();
-  let month = date.month();
-  let year = date.year();
-  let startDate = date.startOf("month").format("YYYY-MM-DD");
-  let endDate = date.endOf("month").format("YYYY-MM-DD");
-  // get month from Query
-  if(req.query.month) {
-    month = req.query.month
-  }
 
-  // get year from Query
-  if(req.query.year) {
-    year = req.query.year
-  }
+  const dbQuery = [
+    { VCHTYPE: { $in: ["Sales", "Export Sales", "Credit Note"] } },
+  ];
 
-  const newDate = dayjs(`${year}-${month}-01`)
-  startDate = newDate.startOf("month").format("YYYY-MM-DD");
-  endDate = newDate.endOf("month").format("YYYY-MM-DD");
-
-  // get start date from Query
-  if(req.query.from) {
-    startDate = req.query.from
-  }
-
-  // get end date from Query
-  if(req.query.to) {
-    endDate = req.query.to
-  }
-  
-
-  const dbQuery = [{ VCHTYPE: {$in:['Sales','Credit Note']} }];
-  dbQuery.push({ DATE: { $gte:  new Date(startDate)} });
-  dbQuery.push({ DATE: { $lte:  new Date(endDate)} });
+  dbQuery.push({ DATE: { $gte: new Date(startDate) } });
+  dbQuery.push({ DATE: { $lte: new Date(endDate) } });
   console.log(JSON.stringify(dbQuery));
 
   const reportData = await db
@@ -183,15 +249,39 @@ export default async function getSalesReport(req, res) {
     .project(["PARTYLEDGERNAME", "LEDGERENTRIES", "INVENTORIES", "DATE"])
     .sort({ DATE: -1 })
     .toArray();
-  const [listing, services, departments] = getListing(reportData);
-  const [summary, sortedServices, sortedListings, sortedDepartments] = getSummary(
-    listing,
-    services,
-    departments
-  );
+  const [listing, services, departments] = getListing(reportData, department);
+  const [summary, sortedServices, sortedListings, sortedDepartments] =
+    getSummary(listing, services, departments);
   client.close();
 
-  res
-    .status(200)
-    .json({ summary, departments: sortedDepartments, services: sortedServices, listing: sortedListings });
+  return {
+    title,
+    departments: sortedDepartments,
+    services: sortedServices
+  };
+}
+
+export default async function getSalesReport(req, res) {
+  const {
+    startDate1,
+    endDate1,
+    startDate2,
+    endDate2,
+    variance,
+    columnHead,
+    department,
+  } = getFilter(req.body);
+  console.log({ startDate1, endDate1, startDate2, endDate2, variance });
+  let result = [
+    await getSalesData(startDate1, endDate1, department, columnHead[0]),
+  ];
+  if (variance) {
+    result.push(
+      await getSalesData(startDate2, endDate2, department, columnHead[1])
+    );
+  }
+
+  res.status(200).json({
+    result,
+  });
 }
